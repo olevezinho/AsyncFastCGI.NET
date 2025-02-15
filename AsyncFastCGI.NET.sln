@@ -1,0 +1,30 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AsyncFastCGI.NET", "AsyncFastCGI.NET.csproj", "{3DD2B862-C36C-A559-5102-B1B0266602CC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example", "example\Example.csproj", "{A0FC842C-5103-E242-CA0E-06B13ABAA9ED}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3DD2B862-C36C-A559-5102-B1B0266602CC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3DD2B862-C36C-A559-5102-B1B0266602CC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3DD2B862-C36C-A559-5102-B1B0266602CC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3DD2B862-C36C-A559-5102-B1B0266602CC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A0FC842C-5103-E242-CA0E-06B13ABAA9ED}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A0FC842C-5103-E242-CA0E-06B13ABAA9ED}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A0FC842C-5103-E242-CA0E-06B13ABAA9ED}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A0FC842C-5103-E242-CA0E-06B13ABAA9ED}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {B9231395-6DD8-4891-A7E2-8E76E65CC22E}
+	EndGlobalSection
+EndGlobal

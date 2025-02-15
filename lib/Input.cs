@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 using System;
-using System.IO;
 using System.Text;
 using System.Net.Sockets;
 using System.Threading.Tasks;
@@ -22,7 +21,8 @@ using System.Collections.Generic;
 
 namespace AsyncFastCGI
 {
-    class Input {
+    public class Input
+    {
         private Socket socket;
         private Record inputRecord;
         private NetworkStream stream;
@@ -69,15 +69,18 @@ namespace AsyncFastCGI
         /// For internal use only. This method does nothing if called
         /// in the request handler.
         /// </summary>
-        public async Task Initialize() {
-            if (this.initialized) {
+        public async Task Initialize()
+        {
+            if (this.initialized)
+            {
                 return;
             }
 
             /*
                 Read the parameters and the header.
             */
-            while(!this.parametersReceived) {
+            while (!this.parametersReceived)
+            {
                 await this.ProcessRecordsAsync(true);
             }
 
@@ -94,8 +97,10 @@ namespace AsyncFastCGI
         /// Any subsequent calls to "Read" methods will result
         /// in an empty response.
         /// </summary>
-        public async Task ReadAllAndDiscardAsync() {
-            while(!this.inputCompleted) {
+        public async Task ReadAllAndDiscardAsync()
+        {
+            while (!this.inputCompleted)
+            {
                 await this.ProcessRecordsAsync(false, true);
             }
         }
@@ -103,8 +108,10 @@ namespace AsyncFastCGI
         /// <summary>
         /// Reads all data from the request into the input buffer.
         /// </summary>
-        private async Task ReadAllAsync() {
-            while(!this.inputCompleted) {
+        private async Task ReadAllAsync()
+        {
+            while (!this.inputCompleted)
+            {
                 await this.ProcessRecordsAsync(false, false);
             }
         }
@@ -114,8 +121,10 @@ namespace AsyncFastCGI
         /// string.
         /// </summary>
         /// <returns></returns>
-        public async Task<string> GetContentAsync() {
-            if (!this.inputCompleted) {
+        public async Task<string> GetContentAsync()
+        {
+            if (!this.inputCompleted)
+            {
                 await this.ReadAllAsync();
             }
 
@@ -129,8 +138,10 @@ namespace AsyncFastCGI
         /// See the 'GetParameter()' method.
         /// </summary>
         /// <returns>Full input data in binary form.</returns>
-        public async Task<byte[]> GetBinaryContentAsync() {
-            if (!this.inputCompleted) {
+        public async Task<byte[]> GetBinaryContentAsync()
+        {
+            if (!this.inputCompleted)
+            {
                 await this.ReadAllAsync();
             }
 
@@ -147,7 +158,8 @@ namespace AsyncFastCGI
         ///     - /etc/nginx/fastcgi_params
         /// </summary>
         /// <returns>A directory of all key-value pairs.</returns>
-        public Dictionary<string, string> GetAllParameters() {
+        public Dictionary<string, string> GetAllParameters()
+        {
             return this.parameters;
         }
 
@@ -156,7 +168,8 @@ namespace AsyncFastCGI
         /// Currently it always returns 1.
         /// </summary>
         /// <returns></returns>
-        public UInt16 GetFastCgiRequestID() {
+        public UInt16 GetFastCgiRequestID()
+        {
             return this.fastCgiRequestID;
         }
 
@@ -171,7 +184,8 @@ namespace AsyncFastCGI
         /// </summary>
         /// <param name="name">The name of the parameter</param>
         /// <returns>The parameter value</returns>
-        public string GetParameter(string name) {
+        public string GetParameter(string name)
+        {
             return this.parameters[name];
         }
 
@@ -179,7 +193,8 @@ namespace AsyncFastCGI
         /// Returns true if all data is read from the input channel, false otherwise.
         /// </summary>
         /// <returns>True if all data is read from the input channel, false otherwise</returns>
-        public bool IsInputCompleted() {
+        public bool IsInputCompleted()
+        {
             return this.inputCompleted;
         }
 
@@ -190,7 +205,8 @@ namespace AsyncFastCGI
         /// connection.
         /// </summary>
         /// <returns>0 for closing, 1 for keeping the connection open after this request.</returns>
-        public bool IsKeepConnection() {
+        public bool IsKeepConnection()
+        {
             return this.keepConnection;
         }
 
@@ -203,76 +219,91 @@ namespace AsyncFastCGI
         /// </summary>
         /// <param name="allowStartingNewRequest">Whether it is expected to start a new request before stopping.</param>
         /// <param name="discardInput">If true, then the request input data is not saved into the buffer.</param>
-        private async Task ProcessRecordsAsync(bool allowStartingNewRequest, bool discardInput = false) {
+        private async Task ProcessRecordsAsync(bool allowStartingNewRequest, bool discardInput = false)
+        {
             bool result;
 
-            while(true) {
+            while (true)
+            {
                 result = await this.inputRecord.ProcessInputAsync(stream);
 
-                if (result) {
+                if (result)
+                {
                     // A complete record has been reconstructed.
                     //  (The next call to processInputAsync will reset the state of the record.)
 
                     if (this.inputRecord.GetRecordType() != Record.TYPE_BEGIN_REQUEST
                         && this.fastCgiRequestID != this.inputRecord.GetRequestID())
                     {
-                        throw(new ClientException("Uknown Request ID received in FastCGI connection."));
+                        throw (new ClientException("Uknown Request ID received in FastCGI connection."));
                     }
 
-                    switch(this.inputRecord.GetRecordType()) {
-                        case Record.TYPE_BEGIN_REQUEST: {
-                            if (!allowStartingNewRequest) {
-                                throw(new Exception("A new request was started in a state when it is unexpected."));
+                    switch (this.inputRecord.GetRecordType())
+                    {
+                        case Record.TYPE_BEGIN_REQUEST:
+                            {
+                                if (!allowStartingNewRequest)
+                                {
+                                    throw (new Exception("A new request was started in a state when it is unexpected."));
+                                }
+
+                                this.fastCgiRequestID = this.inputRecord.GetRequestID();
+                                this.role = this.inputRecord.GetRole();
+                                this.keepConnection = this.inputRecord.IsKeepConnection();
+
+                                this.parametersReceived = false;
+                                this.initialized = false;
+                                this.inputCompleted = false;
+
+                                break;
                             }
+                        case Record.TYPE_PARAMS:
+                            {
+                                if (this.inputRecord.GetContentLength() == 0)
+                                {
+                                    this.parameters = this.inputBuffer.GetNameValuePairs();
 
-                            this.fastCgiRequestID = this.inputRecord.GetRequestID();
-                            this.role = this.inputRecord.GetRole();
-                            this.keepConnection = this.inputRecord.IsKeepConnection();
+                                    this.parametersReceived = true;
+                                    this.inputBuffer.Reset();
+                                    return;
+                                }
 
-                            this.parametersReceived = false;
-                            this.initialized = false;
-                            this.inputCompleted = false;
-
-                            break;
-                        }
-                        case Record.TYPE_PARAMS: {
-                            if (this.inputRecord.GetContentLength() == 0) {
-                                this.parameters = this.inputBuffer.GetNameValuePairs();
-
-                                this.parametersReceived = true;
-                                this.inputBuffer.Reset();
-                                return;
-                            }
-
-                            this.inputRecord.CopyContentTo(this.inputBuffer);
-
-                            if (this.inputBuffer.GetLength() > this.maxHeaderSize) {
-                                throw(new ClientException($"Parameter data exceeds the maximal size of {this.maxHeaderSize} bytes."));
-                            }
-
-                            break;
-                        }
-                        case Record.TYPE_STDIN: {
-                            if (this.inputRecord.GetContentLength() == 0) {
-                                this.inputCompleted = true;
-                                return;
-                            }
-
-                            if (!discardInput) {
                                 this.inputRecord.CopyContentTo(this.inputBuffer);
+
+                                if (this.inputBuffer.GetLength() > this.maxHeaderSize)
+                                {
+                                    throw (new ClientException($"Parameter data exceeds the maximal size of {this.maxHeaderSize} bytes."));
+                                }
+
+                                break;
                             }
-                            
-                            return;
-                        }
-                        case Record.TYPE_GET_VALUES: {
-                            throw(new ClientException("The server sent a FastCGI 'GET_VALUES' request, which is not yet supported."));
-                        }
-                        case Record.TYPE_ABORT_REQUEST: {
-                            throw(new ClientException("Webserver aborted the request."));
-                        }
-                        default: {
-                            throw(new ClientException($"Unknown record Type: {this.inputRecord.GetRecordType()}. Length: {this.inputRecord.GetContentLength()}"));
-                        }
+                        case Record.TYPE_STDIN:
+                            {
+                                if (this.inputRecord.GetContentLength() == 0)
+                                {
+                                    this.inputCompleted = true;
+                                    return;
+                                }
+
+                                if (!discardInput)
+                                {
+                                    this.inputRecord.CopyContentTo(this.inputBuffer);
+                                }
+
+                                return;
+                            }
+                        case Record.TYPE_GET_VALUES:
+                            {
+                                throw (new ClientException("The server sent a FastCGI 'GET_VALUES' request, which is not yet supported."));
+                            }
+                        case Record.TYPE_ABORT_REQUEST:
+                            {
+                                throw (new ClientException("Webserver aborted the request."));
+                            }
+                        default:
+                            {
+                                throw (new ClientException($"Unknown record Type: {this.inputRecord.GetRecordType()}. Length: {this.inputRecord.GetContentLength()}"));
+                            }
                     }
                 }
             }
@@ -284,10 +315,12 @@ namespace AsyncFastCGI
         /// </summary>
         /// <returns>A text with lines containing key-value pairs,
         /// separated by a colon and a space.</returns>
-        public string GetParametersAsText() {
+        public string GetParametersAsText()
+        {
             StringBuilder sb = new StringBuilder();
 
-            foreach(var item in this.GetAllParameters()) {
+            foreach (var item in this.GetAllParameters())
+            {
                 sb.Append($"{item.Key}: {item.Value}\n");
             }
 

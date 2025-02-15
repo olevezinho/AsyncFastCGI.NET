@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 using System;
-using System.IO;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using System.Collections.Generic;
@@ -22,7 +21,8 @@ using System.Text;
 
 namespace AsyncFastCGI
 {
-    class Output {
+    public class Output
+    {
         private Input input;
         private Socket connection;
         private NetworkStream stream;
@@ -39,7 +39,8 @@ namespace AsyncFastCGI
         /// </summary>
         /// <param name="request">Socket of the client connection.</param>
         /// <param name="requestID">FastCGI request ID</param>
-        public Output(Input input, Socket request, NetworkStream stream, UInt16 requestID, Record record, FifoStream outputBuffer) {
+        public Output(Input input, Socket request, NetworkStream stream, UInt16 requestID, Record record, FifoStream outputBuffer)
+        {
             this.input = input;
             this.connection = request;
             this.stream = stream;
@@ -48,7 +49,7 @@ namespace AsyncFastCGI
             this.outputBuffer = outputBuffer;
             this.outputBuffer.Reset();
             this.record = record;
-            
+
             this.ended = false;
             this.headerSent = false;
 
@@ -64,12 +65,15 @@ namespace AsyncFastCGI
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        public async Task WriteAsync(string data) {
-            if (this.ended) {
+        public async Task WriteAsync(string data)
+        {
+            if (this.ended)
+            {
                 return;
             }
 
-            if (!this.headerSent) {
+            if (!this.headerSent)
+            {
                 /*
                     Send HTTP header if it wasn't sent yet.
                 */
@@ -87,12 +91,15 @@ namespace AsyncFastCGI
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        public async Task writeBinaryAsync(byte[] data) {
-            if (this.ended) {
+        public async Task writeBinaryAsync(byte[] data)
+        {
+            if (this.ended)
+            {
                 return;
             }
 
-            if (!this.headerSent) {
+            if (!this.headerSent)
+            {
                 /*
                     Send HTTP header if it wasn't sent yet.
                 */
@@ -108,8 +115,10 @@ namespace AsyncFastCGI
         /// close the FastCGI STDOUT with an empty record,
         /// and send an "end request" record.
         /// </summary>
-        public async Task EndAsync() {
-            if (this.ended) {
+        public async Task EndAsync()
+        {
+            if (this.ended)
+            {
                 return;
             }
 
@@ -126,7 +135,7 @@ namespace AsyncFastCGI
             */
             this.record.END_REQUEST(this.requestID, 0, Record.PROTOCOL_STATUS_REQUEST_COMPLETE);
             await this.record.sendAsync(this.stream);
-            
+
             this.ended = true;
         }
 
@@ -134,7 +143,8 @@ namespace AsyncFastCGI
         /// Returns true if the output has been closed already, false otherwise.
         /// </summary>
         /// <returns>bool</returns>
-        public bool IsEnded() {
+        public bool IsEnded()
+        {
             return this.ended;
         }
 
@@ -142,7 +152,8 @@ namespace AsyncFastCGI
         /// Set the HTTP response status.
         /// </summary>
         /// <param name="status">HTTP response status. Example: 200</param>
-        public void SetHttpStatus(int status) {
+        public void SetHttpStatus(int status)
+        {
             this.httpStatus = status;
         }
 
@@ -152,7 +163,8 @@ namespace AsyncFastCGI
         /// </summary>
         /// <param name="name">Name of the header entry. Example: "Content-Type"</param>
         /// <param name="value">Value of the header entry. Example: "text/html; charset=utf-8"</param>
-        public void SetHeader(string name, string value) {
+        public void SetHeader(string name, string value)
+        {
             this.header[name] = value;
         }
 
@@ -160,19 +172,23 @@ namespace AsyncFastCGI
         /// Writes the HTTP header into the output buffer.
         /// Call it after the first call to a "Write" method.
         /// </summary>
-        private void writeHeader() {
+        private void writeHeader()
+        {
             string codeText = Client.GetHttpStatusText(this.httpStatus);
-            if (codeText == "") {
+            if (codeText == "")
+            {
                 this.outputBuffer.Write(
                     Encoding.UTF8.GetBytes($"HTTP/1.1 {this.httpStatus}\r\n")
                 );
-            } else {
+            }
+            else
+            {
                 this.outputBuffer.Write(
                     Encoding.UTF8.GetBytes($"HTTP/1.1 {this.httpStatus} {codeText}\r\n")
                 );
             }
 
-            foreach(KeyValuePair<string, string> entry in this.header)
+            foreach (KeyValuePair<string, string> entry in this.header)
             {
                 this.outputBuffer.Write(
                     Encoding.UTF8.GetBytes($"{entry.Key}: {entry.Value}\r\n")
@@ -191,20 +207,27 @@ namespace AsyncFastCGI
         /// </summary>
         /// <param name="sendLeftover">False: Don't send the last segment
         /// if it's not exactly 65535 bytes. True: send all.</param>
-        private async Task sendBuffer(bool sendLeftover = false) {
-            while(this.outputBuffer.GetLength() > 0) {
-                if (!sendLeftover && this.outputBuffer.GetLength() < Record.MAX_CONTENT_SIZE) {
+        private async Task sendBuffer(bool sendLeftover = false)
+        {
+            while (this.outputBuffer.GetLength() > 0)
+            {
+                if (!sendLeftover && this.outputBuffer.GetLength() < Record.MAX_CONTENT_SIZE)
+                {
                     return;
                 }
 
-                if (!this.input.IsInputCompleted()) {
+                if (!this.input.IsInputCompleted())
+                {
                     await this.input.ReadAllAndDiscardAsync();
                 }
 
                 this.record.STDOUT(this.requestID, this.outputBuffer);
-                try {
+                try
+                {
                     await this.record.sendAsync(this.stream);
-                } catch (Exception e) {
+                }
+                catch (Exception e)
+                {
                     Console.WriteLine(e.ToString());
                     this.ended = true;
                 }

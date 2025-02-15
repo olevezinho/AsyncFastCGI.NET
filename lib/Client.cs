@@ -21,7 +21,7 @@ using System.Collections.Generic;
 
 namespace AsyncFastCGI
 {
-    class Client
+    public class Client
     {
         public delegate Task RequestHandlerDelegate(AsyncFastCGI.Input input, AsyncFastCGI.Output output);
 
@@ -80,10 +80,13 @@ namespace AsyncFastCGI
         /// <param name="bindAddress"></param>
         public void SetBindAddress(string bindAddress)
         {
-            try {
+            try
+            {
                 this.bindAddress = IPAddress.Parse(bindAddress);
-            } catch (Exception e) {
-                throw(new ClientException($"Invalid bind address '{bindAddress}'.", e));
+            }
+            catch (Exception e)
+            {
+                throw (new ClientException($"Invalid bind address '{bindAddress}'.", e));
             }
         }
 
@@ -99,17 +102,20 @@ namespace AsyncFastCGI
 
         private int connectionTimeout;
 
-        public void SetConnectionTimeout(int ms) {
+        public void SetConnectionTimeout(int ms)
+        {
             this.connectionTimeout = ms;
         }
 
-        public int GetConnectionTimeout() {
+        public int GetConnectionTimeout()
+        {
             return this.connectionTimeout;
         }
 
         private int maxHeaderSize;
 
-        public int GetMaxHeaderSize() {
+        public int GetMaxHeaderSize()
+        {
             return this.maxHeaderSize;
         }
 
@@ -119,7 +125,8 @@ namespace AsyncFastCGI
         /// since that converts them into parameters.
         /// </summary>
         /// <param name="value">The maximum allowed size for HTTP headers.</param>
-        public void SetMaxHeaderSize(int value) {
+        public void SetMaxHeaderSize(int value)
+        {
             this.maxHeaderSize = value;
         }
 
@@ -132,7 +139,8 @@ namespace AsyncFastCGI
         /// <summary>
         /// Constructor. Setting defaults.
         /// </summary>
-        public Client() {
+        public Client()
+        {
             /*
                 Defaults
             */
@@ -151,16 +159,19 @@ namespace AsyncFastCGI
             Socket connection = null;
 
             int callbackCount = this.RequestHandler.GetInvocationList().Length;
-            if (callbackCount < 1) {
-                throw(new ClientException("Please set a callback for new requests. (Client.OnNewRequest)"));
+            if (callbackCount < 1)
+            {
+                throw (new ClientException("Please set a callback for new requests. (Client.OnNewRequest)"));
             }
 
-            if (callbackCount > 1) {
-                throw(new ClientException("It isn't allowed to set more than one callback for new requests. (Client.OnNewRequest)"));
+            if (callbackCount > 1)
+            {
+                throw (new ClientException("It isn't allowed to set more than one callback for new requests. (Client.OnNewRequest)"));
             }
 
-            if (this.port < 1 || this.port > 65535) {
-                throw(new ClientException($"The specified port is invalid: {this.port}"));
+            if (this.port < 1 || this.port > 65535)
+            {
+                throw (new ClientException($"The specified port is invalid: {this.port}"));
             }
 
             Client.InitHttpStatuses();
@@ -186,7 +197,8 @@ namespace AsyncFastCGI
                 First fill the arrays with Requests and Tasks as
                 the new connections arrive.
             */
-            for (int i = 0; i < this.maxConcurrentRequests; i++) {
+            for (int i = 0; i < this.maxConcurrentRequests; i++)
+            {
                 connection = await this.AcceptConnection(listeningSocket);
 
                 this.requests[i] = new Request(i, this.RequestHandler, this.GetMaxHeaderSize());
@@ -199,7 +211,8 @@ namespace AsyncFastCGI
                 Re-use the Request objects to minimize memory
                 allocation and garbage collection.
             */
-            while(true) {
+            while (true)
+            {
                 int index = (await Task.WhenAny(this.tasks)).Result;
                 connection = await this.AcceptConnection(listeningSocket);
                 this.tasks[index] = this.requests[index].NewConnection(connection);
@@ -212,21 +225,25 @@ namespace AsyncFastCGI
         /// </summary>
         /// <param name="listeningSocket"></param>
         /// <returns></returns>
-        private async Task<Socket> AcceptConnection(Socket listeningSocket) {
+        private async Task<Socket> AcceptConnection(Socket listeningSocket)
+        {
             Socket connection;
 
-            try {
+            try
+            {
                 connection = await listeningSocket.AcceptAsync();
-            } catch (Exception e) {
-                throw(new ClientException("Listening socket lost. (Socket.AcceptAsync)", e));
+            }
+            catch (Exception e)
+            {
+                throw (new ClientException("Listening socket lost. (Socket.AcceptAsync)", e));
             }
 
             // Configure the socket of the connection
             connection.ReceiveTimeout = this.GetConnectionTimeout();
             connection.SendTimeout = this.GetConnectionTimeout();
 
-            LingerOption lingerOption = new LingerOption (true, 20);
-            connection.SetSocketOption (SocketOptionLevel.Socket, SocketOptionName.Linger, lingerOption);
+            LingerOption lingerOption = new LingerOption(true, 20);
+            connection.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Linger, lingerOption);
 
             return connection;
         }
@@ -237,8 +254,10 @@ namespace AsyncFastCGI
         /// </summary>
         /// <param name="httpStatusCode"></param>
         /// <returns>Text representation of the code.</returns>
-        public static string GetHttpStatusText(int httpStatusCode) {
-            if (!Client.httpStatuses.ContainsKey(httpStatusCode)) {
+        public static string GetHttpStatusText(int httpStatusCode)
+        {
+            if (!Client.httpStatuses.ContainsKey(httpStatusCode))
+            {
                 return "";
             }
 
@@ -248,7 +267,8 @@ namespace AsyncFastCGI
         /// <summary>
         /// Initialize the dictionary of HTTP status codes/texts.
         /// </summary>
-        private static void InitHttpStatuses() {
+        private static void InitHttpStatuses()
+        {
             Client.httpStatuses = new Dictionary<int, string>();
 
             Client.httpStatuses[100] = "Continue";

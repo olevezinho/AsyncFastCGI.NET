@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 using System;
-using System.IO;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 
-namespace AsyncFastCGI {
-    class Request {
+namespace AsyncFastCGI
+{
+    public class Request
+    {
         private int index;
         private Record inputRecord;
         private Record outputRecord;
@@ -35,7 +36,8 @@ namespace AsyncFastCGI {
         /// <param name="index">The index of the request, by which the Client object identifies it.</param>
         /// <param name="requestHandler">The client callback, which handles the incoming HTTP requests.</param>
         /// <param name="maxHeaderSize">The maximum allowed HTTP header size.</param>
-        public Request(int index, Client.RequestHandlerDelegate requestHandler, int maxHeaderSize) {
+        public Request(int index, Client.RequestHandlerDelegate requestHandler, int maxHeaderSize)
+        {
             this.index = index;
             this.inputRecord = new Record();
             this.outputRecord = new Record();
@@ -49,7 +51,8 @@ namespace AsyncFastCGI {
         /// Get the index of the request, by which the Client object identifies it.
         /// </summary>
         /// <returns>The integer index of the request.</returns>
-        public int GetIndex() {
+        public int GetIndex()
+        {
             return this.index;
         }
 
@@ -59,31 +62,40 @@ namespace AsyncFastCGI {
         /// </summary>
         /// <param name="request">The socket for the new incoming connection.</param>
         /// <returns>The index of the Request.</returns>
-        public async Task<int> NewConnection(Socket request) {
+        public async Task<int> NewConnection(Socket request)
+        {
             NetworkStream stream = new NetworkStream(request);
             Input input;
             Output output;
 
-            do {
+            do
+            {
                 input = new Input(request, stream, this.inputRecord, this.inputBuffer, this.maxHeaderSize);
 
-                try {
+                try
+                {
                     await input.Initialize();
-                } catch (ClientException e) {
+                }
+                catch (ClientException e)
+                {
                     Console.Error.WriteLine(e.Message);
                     request.Close();
                     return this.index;
                 }
-                
+
                 output = new Output(input, request, stream, input.GetFastCgiRequestID(), this.outputRecord, this.outputBuffer);
 
-                try {
+                try
+                {
                     await this.requestHandler(input, output);
 
-                    if (!output.IsEnded()) {
+                    if (!output.IsEnded())
+                    {
                         await output.EndAsync();
                     }
-                } catch (ClientException e) {
+                }
+                catch (ClientException e)
+                {
                     Console.Error.WriteLine(e.Message);
                     request.Close();
                     return this.index;

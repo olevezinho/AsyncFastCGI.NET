@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 using System;
-using System.IO;
 using System.Threading.Tasks;
 using System.Net.Sockets;
 
-namespace AsyncFastCGI {
-    class Record {
+namespace AsyncFastCGI
+{
+    public class Record
+    {
         /*
             Size constraints
         */
@@ -73,23 +74,28 @@ namespace AsyncFastCGI {
         private int recordLength = 0;
         private UInt16 recordPaddingLength = 0;
 
-        public int GetRecordType() {
+        public int GetRecordType()
+        {
             return this.recordType;
         }
 
-        public int GetLength() {
+        public int GetLength()
+        {
             return this.recordLength;
         }
 
-        public UInt16 GetRequestID() {
+        public UInt16 GetRequestID()
+        {
             return this.recordRequestID;
         }
 
-        public UInt16 GetContentLength() {
+        public UInt16 GetContentLength()
+        {
             return this.recordContentLength;
         }
 
-        public Record() {
+        public Record()
+        {
             this.buffer = new byte[MAX_RECORD_SIZE];
             this.isLittleEndian = BitConverter.IsLittleEndian;
         }
@@ -99,36 +105,45 @@ namespace AsyncFastCGI {
         /// stream until at least one complete record is reconstructed.
         /// </summary>
         /// <returns>True if a complete record has been reconstructed, false otherwise.</returns>
-        public async Task<bool> ProcessInputAsync(NetworkStream stream) {
+        public async Task<bool> ProcessInputAsync(NetworkStream stream)
+        {
             bool skipRead = false;
-            if (this.completeRecordReconstructed) {
+            if (this.completeRecordReconstructed)
+            {
                 skipRead = this.StartNextRecord();
             }
 
-            if (!skipRead) {
+            if (!skipRead)
+            {
                 int remaining = MAX_RECORD_SIZE - bufferEnd;
                 int bytesRead = await stream.ReadAsync(this.buffer, this.bufferEnd, remaining);
-                if (bytesRead == 0) {
-                    throw(new ClientException("Socket disconnected while trying to read."));
+                if (bytesRead == 0)
+                {
+                    throw (new ClientException("Socket disconnected while trying to read."));
                 }
-                
+
                 this.bufferEnd += bytesRead;
             }
-        
+
             /*
                 Reconstruct the header
             */
-            if (!headerReconstructed) {
-                if (this.bufferEnd + 1 < HEADER_SIZE) {
+            if (!headerReconstructed)
+            {
+                if (this.bufferEnd + 1 < HEADER_SIZE)
+                {
                     return false;
                 }
 
                 this.recordVersion = this.buffer[0];
                 this.recordType = this.buffer[1];
-                if (this.isLittleEndian) {
+                if (this.isLittleEndian)
+                {
                     this.recordRequestID = (UInt16)((this.buffer[2] << 8) | this.buffer[3]);
                     this.recordContentLength = (UInt16)((this.buffer[4] << 8) | this.buffer[5]);
-                } else {
+                }
+                else
+                {
                     this.recordRequestID = (UInt16)((this.buffer[3] << 8) | this.buffer[2]);
                     this.recordContentLength = (UInt16)((this.buffer[5] << 8) | this.buffer[4]);
                 }
@@ -138,7 +153,8 @@ namespace AsyncFastCGI {
                 this.headerReconstructed = true;
             }
 
-            if (this.bufferEnd >= this.recordLength) {
+            if (this.bufferEnd >= this.recordLength)
+            {
                 this.completeRecordReconstructed = true;
                 return true;
             }
@@ -146,9 +162,11 @@ namespace AsyncFastCGI {
             return false;
         }
 
-        private bool StartNextRecord() {
+        private bool StartNextRecord()
+        {
             int leftover = this.bufferEnd - this.recordLength;
-            if (leftover > 0) {
+            if (leftover > 0)
+            {
                 Array.Copy(this.buffer, this.recordLength, this.buffer, 0, leftover);
             }
 
@@ -156,14 +174,16 @@ namespace AsyncFastCGI {
             this.completeRecordReconstructed = false;
             this.headerReconstructed = false;
 
-            if (leftover > 0) {
+            if (leftover > 0)
+            {
                 return true;
             }
 
             return false;
         }
 
-        public void Reset() {
+        public void Reset()
+        {
             this.bufferEnd = 0;
             this.completeRecordReconstructed = false;
             this.headerReconstructed = false;
@@ -173,8 +193,10 @@ namespace AsyncFastCGI {
         /// Returns the role, which can be: responder, authorizer, filter.
         /// </summary>
         /// <returns>Role identifier value</returns>
-        public UInt16 GetRole() {
-            if (this.isLittleEndian) {
+        public UInt16 GetRole()
+        {
+            if (this.isLittleEndian)
+            {
                 return (UInt16)((this.buffer[HEADER_SIZE + 0] << 8) | this.buffer[HEADER_SIZE + 1]);
             }
 
@@ -188,7 +210,8 @@ namespace AsyncFastCGI {
         /// retains responsibility for the connection.
         /// </summary>
         /// <returns>0 for closing, 1 for keeping the connection open after this request.</returns>
-        public bool IsKeepConnection() {
+        public bool IsKeepConnection()
+        {
             return this.buffer[HEADER_SIZE + 2] > 0;
         }
 
@@ -197,7 +220,8 @@ namespace AsyncFastCGI {
         /// the passed FIFO stream.
         /// </summary>
         /// <param name="stream">The stream which receives the data</param>
-        public void CopyContentTo(FifoStream stream) {
+        public void CopyContentTo(FifoStream stream)
+        {
             byte[] data = new byte[this.recordContentLength];
             Array.Copy(this.buffer, HEADER_SIZE, data, 0, this.recordContentLength);
             stream.Write(data);
@@ -209,31 +233,38 @@ namespace AsyncFastCGI {
         /// <param name="requestID">FastCGI request ID</param>
         /// <param name="fifo">Data source. Pass null to create an empty closing record.</param>
         /// <returns>Number of bytes transferred from the FIFO stream.</returns>
-        public int STDOUT(UInt16 requestID, FifoStream fifo) {
+        public int STDOUT(UInt16 requestID, FifoStream fifo)
+        {
             /*
                 Set content
             */
             UInt16 length;
 
-            if (fifo == null) {
+            if (fifo == null)
+            {
                 length = 0;
-            } else {
+            }
+            else
+            {
                 length = (UInt16)fifo.Read(Record.MAX_CONTENT_SIZE, this.buffer, 8);
             }
-            
+
             /*
                 Set header
             */
             this.buffer[0] = (byte)1;               // Version
             this.buffer[1] = (byte)TYPE_STDOUT;     // Type
 
-            if (isLittleEndian) {
+            if (isLittleEndian)
+            {
                 this.buffer[2] = (byte)(requestID >> 8);      // Request ID 1
                 this.buffer[3] = (byte)(requestID & 0x00FF);  // Request ID 0
 
                 this.buffer[4] = (byte)(length >> 8);         // Content Length 1
                 this.buffer[5] = (byte)(length & 0x00FF);     // Content Length 0
-            } else {
+            }
+            else
+            {
                 this.buffer[2] = (byte)(requestID << 8);      // Request ID 1
                 this.buffer[3] = (byte)(requestID & 0xFF00);  // Request ID 0
 
@@ -255,20 +286,24 @@ namespace AsyncFastCGI {
         /// <param name="requestID">FastCGI request ID</param>
         /// <param name="appStatus">Return 0 for success, or an error code otherwise.</param>
         /// <param name="protocolStatus">See the FastCGI specification for possible values.</param>
-        public void END_REQUEST(UInt16 requestID, int appStatus, byte protocolStatus) {
+        public void END_REQUEST(UInt16 requestID, int appStatus, byte protocolStatus)
+        {
             /*
                 Set header
             */
             this.buffer[0] = (byte)1;                   // Version
             this.buffer[1] = (byte)TYPE_END_REQUEST;    // Type
 
-            if (isLittleEndian) {
+            if (isLittleEndian)
+            {
                 this.buffer[2] = (byte)(requestID >> 8);      // Request ID 1
                 this.buffer[3] = (byte)(requestID & 0x00FF);  // Request ID 0
 
                 this.buffer[4] = (byte)0;                     // Content Length 1
                 this.buffer[5] = (byte)6;                     // Content Length 0
-            } else {
+            }
+            else
+            {
                 this.buffer[2] = (byte)(requestID << 8);      // Request ID 1
                 this.buffer[3] = (byte)(requestID & 0xFF00);  // Request ID 0
 
@@ -282,12 +317,15 @@ namespace AsyncFastCGI {
             /*
                 Set content
             */
-            if (this.isLittleEndian) {
+            if (this.isLittleEndian)
+            {
                 this.buffer[8] = (byte)(appStatus >> 24);
                 this.buffer[9] = (byte)(appStatus >> 16);
                 this.buffer[10] = (byte)(appStatus >> 8);
                 this.buffer[11] = (byte)appStatus;
-            } else {
+            }
+            else
+            {
                 this.buffer[8] = (byte)appStatus;
                 this.buffer[9] = (byte)(appStatus << 8);
                 this.buffer[10] = (byte)(appStatus << 16);
@@ -304,12 +342,16 @@ namespace AsyncFastCGI {
         /// Send the record through the connection.
         /// </summary>
         /// <param name="stream">Stream of the connection socket.</param>
-        public async Task sendAsync(NetworkStream stream) {
-            try {
+        public async Task sendAsync(NetworkStream stream)
+        {
+            try
+            {
                 await stream.WriteAsync(this.buffer, 0, this.bufferEnd);
                 await stream.FlushAsync();
-            } catch (Exception e) {
-                throw(new ClientException("Socket disconnected while trying to write to stream.", e));
+            }
+            catch (Exception e)
+            {
+                throw (new ClientException("Socket disconnected while trying to write to stream.", e));
             }
         }
     }

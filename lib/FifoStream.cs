@@ -16,7 +16,8 @@
 using System;
 using System.Collections.Generic;
 
-namespace AsyncFastCGI {
+namespace AsyncFastCGI
+{
     /// <summary>
     /// This class helps the memory-efficient handling of chunks of binary
     /// data. Its helps to avoid memory allocations and copying.
@@ -24,7 +25,8 @@ namespace AsyncFastCGI {
     /// the client application for output, and in the input data
     /// processing.
     /// </summary>
-    class FifoStream {
+    public class FifoStream
+    {
         /// <summary>
         /// The amount of data in the stream,
         /// which hasn't been read.
@@ -42,16 +44,19 @@ namespace AsyncFastCGI {
         /// When a segment is fully read, it is removed
         /// from the FifoStream.
         /// </summary>
-        private class Segment {
+        private class Segment
+        {
             public byte[] data;
             public int offset;
 
-            public Segment(byte[] data) {
+            public Segment(byte[] data)
+            {
                 this.data = data;
                 this.offset = 0;
             }
 
-            public int GetLength() {
+            public int GetLength()
+            {
                 return this.data.Length - offset;
             }
         }
@@ -62,7 +67,8 @@ namespace AsyncFastCGI {
         /// <summary>
         /// Constructor
         /// </summary>
-        public FifoStream(int workBufferSize) {
+        public FifoStream(int workBufferSize)
+        {
             this.length = 0;
             this.buffer = new List<Segment>();
             this.workBuffer = new byte[workBufferSize];
@@ -72,7 +78,8 @@ namespace AsyncFastCGI {
         /// <summary>
         /// Remove all data and reset state.
         /// </summary>
-        public void Reset() {
+        public void Reset()
+        {
             this.length = 0;
             this.buffer.Clear();
         }
@@ -81,7 +88,8 @@ namespace AsyncFastCGI {
         /// Get the number of bytes in the FIFO stream.
         /// </summary>
         /// <returns></returns>
-        public int GetLength() {
+        public int GetLength()
+        {
             return this.length;
         }
 
@@ -90,7 +98,8 @@ namespace AsyncFastCGI {
         /// No copy made. FifoMemoryStream will not make any changes to them.
         /// </summary>
         /// <param name="data">Byte array to add to the FIFO stream.</param>
-        public void Write(byte[] data) {
+        public void Write(byte[] data)
+        {
             this.buffer.Add(new Segment(data));
             this.length += data.Length;
         }
@@ -103,13 +112,16 @@ namespace AsyncFastCGI {
         /// <param name="outBuffer">The target buffer, where we copy the bytes to.</param>
         /// <param name="outBufferOffset">The copying to the target buffer starts with this offset.</param>
         /// <returns>The number of bytes written to the output.</returns>
-        public int Read(int count, byte[] outBuffer, int outBufferOffset) {
-            if (this.buffer.Count < 1) {
+        public int Read(int count, byte[] outBuffer, int outBufferOffset)
+        {
+            if (this.buffer.Count < 1)
+            {
                 return 0;
             }
 
             count = Math.Min(count, outBuffer.Length - outBufferOffset);
-            if (count < 1) {
+            if (count < 1)
+            {
                 return 0;
             }
 
@@ -118,25 +130,31 @@ namespace AsyncFastCGI {
             int transferred = 0;
             int remaining = count;
 
-            while(remaining > 0) {
+            while (remaining > 0)
+            {
                 current = this.buffer[0];
                 currentLength = current.data.Length - current.offset;
 
-                if (currentLength > remaining) {
+                if (currentLength > remaining)
+                {
                     Array.Copy(current.data, current.offset, outBuffer, outBufferOffset, remaining);
                     this.length -= remaining;
                     transferred += remaining;
                     current.offset += remaining;
 
                     return transferred; // remaining = 0
-                } else if (currentLength == remaining) {
+                }
+                else if (currentLength == remaining)
+                {
                     Array.Copy(current.data, current.offset, outBuffer, outBufferOffset, remaining);
                     this.length -= remaining;
                     transferred += remaining;
                     this.buffer.RemoveAt(0);
 
                     return transferred; // remaining = 0
-                } else {
+                }
+                else
+                {
                     // currentLength < remaining
                     Array.Copy(current.data, current.offset, outBuffer, outBufferOffset, currentLength);
                     this.length -= currentLength;
@@ -145,7 +163,8 @@ namespace AsyncFastCGI {
                     outBufferOffset += currentLength;
                     this.buffer.RemoveAt(0);
 
-                    if (this.buffer.Count < 1) {
+                    if (this.buffer.Count < 1)
+                    {
                         return transferred;
                     }
                 }
@@ -159,7 +178,8 @@ namespace AsyncFastCGI {
         /// Parses them, and returns them as a dictinary.
         /// </summary>
         /// <returns>A dictionary of name-value pairs.</returns>
-        public Dictionary<string, string> GetNameValuePairs() {
+        public Dictionary<string, string> GetNameValuePairs()
+        {
             int length = Math.Min(this.length, this.workBuffer.Length);
             Dictionary<string, string> dict = new Dictionary<string, string>();
 
@@ -170,18 +190,22 @@ namespace AsyncFastCGI {
             string name;
             string value;
 
-            while(cursor < length) {
+            while (cursor < length)
+            {
                 nameLength = ParseNameValueLength(ref cursor, length);
-                if (nameLength == -1) {
+                if (nameLength == -1)
+                {
                     break;
                 }
 
                 valueLength = ParseNameValueLength(ref cursor, length);
-                if (valueLength == -1) {
+                if (valueLength == -1)
+                {
                     break;
                 }
 
-                if (cursor + nameLength + valueLength > length) {
+                if (cursor + nameLength + valueLength > length)
+                {
                     break;
                 }
 
@@ -203,25 +227,32 @@ namespace AsyncFastCGI {
         /// <param name="cursor"></param>
         /// <param name="bufferSize"></param>
         /// <returns></returns>
-        private int ParseNameValueLength(ref int cursor, int bufferSize) {
-            if (cursor >= bufferSize - 1) {
+        private int ParseNameValueLength(ref int cursor, int bufferSize)
+        {
+            if (cursor >= bufferSize - 1)
+            {
                 return -1;
             }
 
-            if (this.workBuffer[cursor] <= 127) {
+            if (this.workBuffer[cursor] <= 127)
+            {
                 return this.workBuffer[cursor++];
             }
 
-            if (cursor + 3 >= bufferSize - 1) {
+            if (cursor + 3 >= bufferSize - 1)
+            {
                 return -1;
             }
 
             int lenght;
 
-            if (this.isLittleEndian) {
+            if (this.isLittleEndian)
+            {
                 lenght = ((this.workBuffer[cursor] & 0x7f) << 24) + (this.workBuffer[cursor + 1] << 16)
                     + (this.workBuffer[cursor + 2] << 8) + this.workBuffer[cursor + 3];
-            } else {
+            }
+            else
+            {
                 lenght = ((this.workBuffer[cursor] & 0x7f)) + (this.workBuffer[cursor + 1] >> 8)
                     + (this.workBuffer[cursor + 2] >> 16) + (this.workBuffer[cursor + 3] >> 24);
             }
@@ -234,11 +265,13 @@ namespace AsyncFastCGI {
         /// Makes a copy of the data inside the FIFO stream.
         /// </summary>
         /// <returns>A byte array containing all data in the stream.</returns>
-        public byte[] Copy() {
+        public byte[] Copy()
+        {
             byte[] data = new byte[this.length];
             int offset = 0, length;
 
-            foreach(var segment in this.buffer) {
+            foreach (var segment in this.buffer)
+            {
                 length = segment.GetLength();
                 Array.Copy(segment.data, segment.offset, data, offset, length);
                 offset += length;
