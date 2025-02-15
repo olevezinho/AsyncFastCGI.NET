@@ -23,17 +23,20 @@ namespace FastCgiExampleApp
     {
         static async Task Main(string[] args)
         {
-            try {
+            try
+            {
                 /*
                     Check the input parameter (port)
                 */
-                if (args.Length < 1) {
-                    throw(new Exception("Input parameter 'port' missing."));
+                if (args.Length < 1)
+                {
+                    throw (new Exception("Input parameter 'port' missing."));
                 }
 
                 int port = 0;
-                if (!Int32.TryParse(args[0], out port)) {
-                    throw(new Exception("Invalid port value."));
+                if (!Int32.TryParse(args[0], out port))
+                {
+                    throw (new Exception("Invalid port value."));
                 }
 
                 /*
@@ -47,12 +50,16 @@ namespace FastCgiExampleApp
                 client.SetConnectionTimeout(10000);     // 10 seconds
                 client.SetMaxHeaderSize(16384);         // 16 KB. Max HTTP header length
                 client.RequestHandler = Program.RequestHandler;
-                
+
                 await client.StartAsync();
-            } catch (AsyncFastCGI.ClientException e) {
+            }
+            catch (AsyncFastCGI.ClientException e)
+            {
                 Console.Error.WriteLine(e.Message);
                 Environment.Exit(1);
-            } catch (Exception e) {
+            }
+            catch (Exception e)
+            {
                 Console.Error.WriteLine(e.ToString());
                 Environment.Exit(1);
             }
@@ -61,7 +68,8 @@ namespace FastCgiExampleApp
         /// <summary>
         /// Here comes your code to handle requests.
         /// </summary>
-        private static async Task RequestHandler(AsyncFastCGI.Input input, AsyncFastCGI.Output output) {
+        private static async Task RequestHandler(AsyncFastCGI.Input input, AsyncFastCGI.Output output)
+        {
             output.SetHttpStatus(200);
             output.SetHeader("Content-Type", "text/html; charset=utf-8");
 
