@@ -4,15 +4,17 @@
         <LangVersion>latest</LangVersion>
 
         <PackageId>AsyncFastCGI.NET</PackageId>
-        <Version>1.0.2</Version>
-        <Authors>Tamas Bolner</Authors>
+        <Version>1.0.2.1-alpha</Version>
+        <Authors>Tamas Bolner, Luis Brochado</Authors>
         <Title>Async FastCGI library for .NET Core</Title>
-        <Description>Fully async FastCGI client library for .NET Core, written in C#. A non-intrusive alternative for developing web applications.</Description>
+        <Description>Fully async FastCGI client library for .NET, written in C#. A non-intrusive alternative for developing web applications.</Description>
         <Copyright>Copyright 2019-2021 Tamas Bolner</Copyright>
         <PackageLicenseFile>LICENSE.md</PackageLicenseFile>
         <PackageTags>fastcgi, nginx, dotnet, library, csharp</PackageTags>
         <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-        <RepositoryUrl>https://github.com/bolner/AsyncFastCGI.NET</RepositoryUrl>
+        <RepositoryUrl>https://github.com/olevezinho/AsyncFastCGI.NET</RepositoryUrl>
+        <IsPackable>true</IsPackable>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     </PropertyGroup>
 
     <ItemGroup>
