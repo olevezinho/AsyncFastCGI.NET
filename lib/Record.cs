@@ -14,303 +14,313 @@
  * limitations under the License.
  */
 using System;
-using System.IO;
 using System.Threading.Tasks;
 using System.Net.Sockets;
 
-namespace AsyncFastCGI {
-    class Record {
-        /*
-            Size constraints
-        */
-        public const int HEADER_SIZE = 8;
-        public const int MAX_CONTENT_SIZE = 65535;
-        public const int MAX_PADDING_SIZE = 255;
-        public const int MAX_RECORD_SIZE = HEADER_SIZE + MAX_CONTENT_SIZE + MAX_PADDING_SIZE;
+namespace AsyncFastCGI;
 
-        /*
-            Record types
-        */
-        public const int TYPE_BEGIN_REQUEST = 1;
-        public const int TYPE_ABORT_REQUEST = 2;
-        public const int TYPE_END_REQUEST = 3;
-        public const int TYPE_PARAMS = 4;
-        public const int TYPE_STDIN = 5;
-        public const int TYPE_STDOUT = 6;
-        public const int TYPE_STDERR = 7;
-        public const int TYPE_DATA = 8;
-        public const int TYPE_GET_VALUES = 9;
-        public const int TYPE_GET_VALUES_RESULT = 10;
-        public const int TYPE_UNKNOWN_TYPE = 11;
+public class Record 
+{
+    /*
+        Size constraints
+    */
+    public const int HEADER_SIZE = 8;
+    public const int MAX_CONTENT_SIZE = 65535;
+    public const int MAX_PADDING_SIZE = 255;
+    public const int MAX_RECORD_SIZE = HEADER_SIZE + MAX_CONTENT_SIZE + MAX_PADDING_SIZE;
 
-        /*
-            Request Roles
-        */
-        public const int ROLE_RESPONDER = 1;
-        public const int ROLE_AUTHORIZER = 2;
-        public const int ROLE_FILTER = 3;
+    /*
+        Record types
+    */
+    public const int TYPE_BEGIN_REQUEST = 1;
+    public const int TYPE_ABORT_REQUEST = 2;
+    public const int TYPE_END_REQUEST = 3;
+    public const int TYPE_PARAMS = 4;
+    public const int TYPE_STDIN = 5;
+    public const int TYPE_STDOUT = 6;
+    public const int TYPE_STDERR = 7;
+    public const int TYPE_DATA = 8;
+    public const int TYPE_GET_VALUES = 9;
+    public const int TYPE_GET_VALUES_RESULT = 10;
+    public const int TYPE_UNKNOWN_TYPE = 11;
 
-        /*
-            Protocol status values for an end request response.
-        */
-        public const int PROTOCOL_STATUS_REQUEST_COMPLETE = 0;
-        public const int PROTOCOL_STATUS_CANT_MPX_CONN = 1;
-        public const int PROTOCOL_STATUS_OVERLOADED = 2;
-        public const int PROTOCOL_STATUS_UNKNOWN_ROLE = 3;
+    /*
+        Request Roles
+    */
+    public const int ROLE_RESPONDER = 1;
+    public const int ROLE_AUTHORIZER = 2;
+    public const int ROLE_FILTER = 3;
 
-        private byte[] buffer;
-        private int bufferEnd = 0;
+    /*
+        Protocol status values for an end request response.
+    */
+    public const int PROTOCOL_STATUS_REQUEST_COMPLETE = 0;
+    public const int PROTOCOL_STATUS_CANT_MPX_CONN = 1;
+    public const int PROTOCOL_STATUS_OVERLOADED = 2;
+    public const int PROTOCOL_STATUS_UNKNOWN_ROLE = 3;
 
-        private bool headerReconstructed = false;
-        private bool completeRecordReconstructed = false;
+    private byte[] _buffer;
+    private int _bufferEnd = 0;
 
-        private bool isLittleEndian;
+    private bool _headerReconstructed = false;
+    private bool _completeRecordReconstructed = false;
 
-        private byte recordVersion = 0;
-        private byte recordType = 0;
-        private UInt16 recordRequestID = 0;
-        private UInt16 recordContentLength = 0;
-        private int recordLength = 0;
-        private UInt16 recordPaddingLength = 0;
+    private bool _isLittleEndian;
 
-        public int GetRecordType() {
-            return this.recordType;
-        }
+    private byte _recordVersion = 0;
+    private byte _recordType = 0;
+    private UInt16 _recordRequestID = 0;
+    private UInt16 _recordContentLength = 0;
+    private int _recordLength = 0;
+    private UInt16 _recordPaddingLength = 0;
 
-        public int GetLength() {
-            return this.recordLength;
-        }
+    public int GetRecordType() => _recordType;
 
-        public UInt16 GetRequestID() {
-            return this.recordRequestID;
-        }
+    public int GetLength() => _recordLength;
 
-        public UInt16 GetContentLength() {
-            return this.recordContentLength;
-        }
+    public UInt16 GetRequestID() => _recordRequestID;
 
-        public Record() {
-            this.buffer = new byte[MAX_RECORD_SIZE];
-            this.isLittleEndian = BitConverter.IsLittleEndian;
-        }
+    public UInt16 GetContentLength() => _recordContentLength;
 
-        /// <summary>
-        /// Use it in an iteration. Keeps reading from the network
-        /// stream until at least one complete record is reconstructed.
-        /// </summary>
-        /// <returns>True if a complete record has been reconstructed, false otherwise.</returns>
-        public async Task<bool> ProcessInputAsync(NetworkStream stream) {
-            bool skipRead = false;
-            if (this.completeRecordReconstructed) {
-                skipRead = this.StartNextRecord();
-            }
+    public Record() 
+    {
+        _buffer = new byte[MAX_RECORD_SIZE];
+        _isLittleEndian = BitConverter.IsLittleEndian;
+    }
 
-            if (!skipRead) {
-                int remaining = MAX_RECORD_SIZE - bufferEnd;
-                int bytesRead = await stream.ReadAsync(this.buffer, this.bufferEnd, remaining);
-                if (bytesRead == 0) {
-                    throw(new ClientException("Socket disconnected while trying to read."));
-                }
+    /// <summary>
+    /// Use it in an iteration. Keeps reading from the network
+    /// stream until at least one complete record is reconstructed.
+    /// </summary>
+    /// <returns>True if a complete record has been reconstructed, false otherwise.</returns>
+    public async Task<bool> ProcessInputAsync(NetworkStream stream) 
+    {
+        var skipRead = false;
+        if (_completeRecordReconstructed)
+            skipRead = StartNextRecord();
+
+        if (!skipRead) 
+        {
+            var remaining = MAX_RECORD_SIZE - _bufferEnd;
+            var bytesRead = await stream.ReadAsync(_buffer, _bufferEnd, remaining);
+            if (bytesRead == 0) 
+                throw new ClientException("Socket disconnected while trying to read.");
                 
-                this.bufferEnd += bytesRead;
-            }
+            _bufferEnd += bytesRead;
+        }
         
-            /*
-                Reconstruct the header
-            */
-            if (!headerReconstructed) {
-                if (this.bufferEnd + 1 < HEADER_SIZE) {
-                    return false;
-                }
+        /*
+            Reconstruct the header
+        */
+        if (!_headerReconstructed) 
+        {
+            if (_bufferEnd + 1 < HEADER_SIZE) 
+                return false;
 
-                this.recordVersion = this.buffer[0];
-                this.recordType = this.buffer[1];
-                if (this.isLittleEndian) {
-                    this.recordRequestID = (UInt16)((this.buffer[2] << 8) | this.buffer[3]);
-                    this.recordContentLength = (UInt16)((this.buffer[4] << 8) | this.buffer[5]);
-                } else {
-                    this.recordRequestID = (UInt16)((this.buffer[3] << 8) | this.buffer[2]);
-                    this.recordContentLength = (UInt16)((this.buffer[5] << 8) | this.buffer[4]);
-                }
-                this.recordPaddingLength = this.buffer[6];
-
-                this.recordLength = HEADER_SIZE + this.recordContentLength + this.recordPaddingLength;
-                this.headerReconstructed = true;
+            _recordVersion = _buffer[0];
+            _recordType = _buffer[1];
+            if (_isLittleEndian) 
+            {
+                _recordRequestID = (UInt16)((_buffer[2] << 8) | _buffer[3]);
+                _recordContentLength = (UInt16)((_buffer[4] << 8) | _buffer[5]);
+            } 
+            else 
+            {
+                _recordRequestID = (UInt16)((_buffer[3] << 8) | _buffer[2]);
+                _recordContentLength = (UInt16)((_buffer[5] << 8) | _buffer[4]);
             }
+            _recordPaddingLength = _buffer[6];
 
-            if (this.bufferEnd >= this.recordLength) {
-                this.completeRecordReconstructed = true;
-                return true;
-            }
-
-            return false;
+            _recordLength = HEADER_SIZE + _recordContentLength + _recordPaddingLength;
+            _headerReconstructed = true;
         }
 
-        private bool StartNextRecord() {
-            int leftover = this.bufferEnd - this.recordLength;
-            if (leftover > 0) {
-                Array.Copy(this.buffer, this.recordLength, this.buffer, 0, leftover);
-            }
-
-            this.bufferEnd = leftover;
-            this.completeRecordReconstructed = false;
-            this.headerReconstructed = false;
-
-            if (leftover > 0) {
-                return true;
-            }
-
-            return false;
+        if (_bufferEnd >= _recordLength) 
+        {
+            _completeRecordReconstructed = true;
+            return true;
         }
 
-        public void Reset() {
-            this.bufferEnd = 0;
-            this.completeRecordReconstructed = false;
-            this.headerReconstructed = false;
-        }
+        return false;
+    }
 
-        /// <summary>
-        /// Returns the role, which can be: responder, authorizer, filter.
-        /// </summary>
-        /// <returns>Role identifier value</returns>
-        public UInt16 GetRole() {
-            if (this.isLittleEndian) {
-                return (UInt16)((this.buffer[HEADER_SIZE + 0] << 8) | this.buffer[HEADER_SIZE + 1]);
-            }
+    private bool StartNextRecord() 
+    {
+        var leftover = _bufferEnd - _recordLength;
+        if (leftover > 0) 
+            Array.Copy(_buffer, _recordLength, _buffer, 0, leftover);
 
-            return (UInt16)((this.buffer[HEADER_SIZE + 1] << 8) | this.buffer[HEADER_SIZE + 0]);
-        }
+        _bufferEnd = leftover;
+        _completeRecordReconstructed = false;
+        _headerReconstructed = false;
 
-        /// <summary>
-        /// For BEGIN_REQUEST records. If zero, the application closes the connection
-        /// after responding to this request. If not zero, the application does not
-        /// close the connection after responding to this request; the Web server
-        /// retains responsibility for the connection.
-        /// </summary>
-        /// <returns>0 for closing, 1 for keeping the connection open after this request.</returns>
-        public bool IsKeepConnection() {
-            return this.buffer[HEADER_SIZE + 2] > 0;
-        }
+        if (leftover > 0)
+            return true;
 
-        /// <summary>
-        /// Makes a copy of the content data, and pushes it into
-        /// the passed FIFO stream.
-        /// </summary>
-        /// <param name="stream">The stream which receives the data</param>
-        public void CopyContentTo(FifoStream stream) {
-            byte[] data = new byte[this.recordContentLength];
-            Array.Copy(this.buffer, HEADER_SIZE, data, 0, this.recordContentLength);
-            stream.Write(data);
-        }
+        return false;
+    }
 
-        /// <summary>
-        /// Converts the record buffer into an STDOUT record, and fills it with data.
-        /// </summary>
-        /// <param name="requestID">FastCGI request ID</param>
-        /// <param name="fifo">Data source. Pass null to create an empty closing record.</param>
-        /// <returns>Number of bytes transferred from the FIFO stream.</returns>
-        public int STDOUT(UInt16 requestID, FifoStream fifo) {
-            /*
-                Set content
-            */
-            UInt16 length;
+    public void Reset()
+    {
+        _bufferEnd = 0;
+        _completeRecordReconstructed = false;
+        _headerReconstructed = false;
+    }
 
-            if (fifo == null) {
-                length = 0;
-            } else {
-                length = (UInt16)fifo.Read(Record.MAX_CONTENT_SIZE, this.buffer, 8);
-            }
+    /// <summary>
+    /// Returns the role, which can be: responder, authorizer, filter.
+    /// </summary>
+    /// <returns>Role identifier value</returns>
+    public UInt16 GetRole() 
+    {
+        if (_isLittleEndian)
+            return (UInt16)((_buffer[HEADER_SIZE + 0] << 8) | _buffer[HEADER_SIZE + 1]);
+
+        return (UInt16)((_buffer[HEADER_SIZE + 1] << 8) | _buffer[HEADER_SIZE + 0]);
+    }
+
+    /// <summary>
+    /// For BEGIN_REQUEST records. If zero, the application closes the connection
+    /// after responding to this request. If not zero, the application does not
+    /// close the connection after responding to this request; the Web server
+    /// retains responsibility for the connection.
+    /// </summary>
+    /// <returns>0 for closing, 1 for keeping the connection open after this request.</returns>
+    public bool IsKeepConnection() => _buffer[HEADER_SIZE + 2] > 0;
+
+    /// <summary>
+    /// Makes a copy of the content data, and pushes it into
+    /// the passed FIFO stream.
+    /// </summary>
+    /// <param name="stream">The stream which receives the data</param>
+    public void CopyContentTo(FifoStream stream) 
+    {
+        var data = new byte[_recordContentLength];
+        Array.Copy(_buffer, HEADER_SIZE, data, 0, _recordContentLength);
+        stream.Write(data);
+    }
+
+    /// <summary>
+    /// Converts the record buffer into an STDOUT record, and fills it with data.
+    /// </summary>
+    /// <param name="requestID">FastCGI request ID</param>
+    /// <param name="fifo">Data source. Pass null to create an empty closing record.</param>
+    /// <returns>Number of bytes transferred from the FIFO stream.</returns>
+    public int STDOUT(UInt16 requestID, FifoStream fifo) 
+    {
+        /*
+            Set content
+        */
+        UInt16 length;
+
+        if (fifo == null) 
+            length = 0;
+        else
+            length = (UInt16)fifo.Read(MAX_CONTENT_SIZE, _buffer, 8);
             
-            /*
-                Set header
-            */
-            this.buffer[0] = (byte)1;               // Version
-            this.buffer[1] = (byte)TYPE_STDOUT;     // Type
+        /*
+            Set header
+        */
+        _buffer[0] = (byte)1;               // Version
+        _buffer[1] = (byte)TYPE_STDOUT;     // Type
 
-            if (isLittleEndian) {
-                this.buffer[2] = (byte)(requestID >> 8);      // Request ID 1
-                this.buffer[3] = (byte)(requestID & 0x00FF);  // Request ID 0
+        if (_isLittleEndian)
+        {
+            _buffer[2] = (byte)(requestID >> 8);      // Request ID 1
+            _buffer[3] = (byte)(requestID & 0x00FF);  // Request ID 0
 
-                this.buffer[4] = (byte)(length >> 8);         // Content Length 1
-                this.buffer[5] = (byte)(length & 0x00FF);     // Content Length 0
-            } else {
-                this.buffer[2] = (byte)(requestID << 8);      // Request ID 1
-                this.buffer[3] = (byte)(requestID & 0xFF00);  // Request ID 0
+            _buffer[4] = (byte)(length >> 8);         // Content Length 1
+            _buffer[5] = (byte)(length & 0x00FF);     // Content Length 0
+        } 
+        else 
+        {
+            _buffer[2] = (byte)(requestID << 8);      // Request ID 1
+            _buffer[3] = (byte)(requestID & 0xFF00);  // Request ID 0
 
-                this.buffer[4] = (byte)(length << 8);         // Content Length 1
-                this.buffer[5] = (byte)(length & 0xFF00);     // Content Length 0
-            }
-
-            this.buffer[6] = 0;     // Padding
-            this.buffer[7] = 0;     // Reserved
-
-            this.bufferEnd = 8 + length;
-
-            return length;
+            _buffer[4] = (byte)(length << 8);         // Content Length 1
+            _buffer[5] = (byte)(length & 0xFF00);     // Content Length 0
         }
 
-        /// <summary>
-        /// Converts this record into type "END_REQUEST".
-        /// </summary>
-        /// <param name="requestID">FastCGI request ID</param>
-        /// <param name="appStatus">Return 0 for success, or an error code otherwise.</param>
-        /// <param name="protocolStatus">See the FastCGI specification for possible values.</param>
-        public void END_REQUEST(UInt16 requestID, int appStatus, byte protocolStatus) {
-            /*
-                Set header
-            */
-            this.buffer[0] = (byte)1;                   // Version
-            this.buffer[1] = (byte)TYPE_END_REQUEST;    // Type
+        _buffer[6] = 0;     // Padding
+        _buffer[7] = 0;     // Reserved
 
-            if (isLittleEndian) {
-                this.buffer[2] = (byte)(requestID >> 8);      // Request ID 1
-                this.buffer[3] = (byte)(requestID & 0x00FF);  // Request ID 0
+        _bufferEnd = 8 + length;
 
-                this.buffer[4] = (byte)0;                     // Content Length 1
-                this.buffer[5] = (byte)6;                     // Content Length 0
-            } else {
-                this.buffer[2] = (byte)(requestID << 8);      // Request ID 1
-                this.buffer[3] = (byte)(requestID & 0xFF00);  // Request ID 0
+        return length;
+    }
 
-                this.buffer[4] = (byte)0;                     // Content Length 1
-                this.buffer[5] = (byte)6;                     // Content Length 0
-            }
+    /// <summary>
+    /// Converts this record into type "END_REQUEST".
+    /// </summary>
+    /// <param name="requestID">FastCGI request ID</param>
+    /// <param name="appStatus">Return 0 for success, or an error code otherwise.</param>
+    /// <param name="protocolStatus">See the FastCGI specification for possible values.</param>
+    public void END_REQUEST(UInt16 requestID, int appStatus, byte protocolStatus) 
+    {
+        /*
+            Set header
+        */
+        _buffer[0] = (byte)1;                   // Version
+        _buffer[1] = (byte)TYPE_END_REQUEST;    // Type
 
-            this.buffer[6] = 0;     // Padding
-            this.buffer[7] = 0;     // Reserved
+        if (_isLittleEndian) 
+        {
+            _buffer[2] = (byte)(requestID >> 8);      // Request ID 1
+            _buffer[3] = (byte)(requestID & 0x00FF);  // Request ID 0
 
-            /*
-                Set content
-            */
-            if (this.isLittleEndian) {
-                this.buffer[8] = (byte)(appStatus >> 24);
-                this.buffer[9] = (byte)(appStatus >> 16);
-                this.buffer[10] = (byte)(appStatus >> 8);
-                this.buffer[11] = (byte)appStatus;
-            } else {
-                this.buffer[8] = (byte)appStatus;
-                this.buffer[9] = (byte)(appStatus << 8);
-                this.buffer[10] = (byte)(appStatus << 16);
-                this.buffer[11] = (byte)(appStatus << 24);
-            }
+            _buffer[4] = (byte)0;                     // Content Length 1
+            _buffer[5] = (byte)6;                     // Content Length 0
+        } 
+        else 
+        {
+            _buffer[2] = (byte)(requestID << 8);      // Request ID 1
+            _buffer[3] = (byte)(requestID & 0xFF00);  // Request ID 0
 
-            this.buffer[12] = protocolStatus;
-            this.buffer[13] = 0;
-
-            this.bufferEnd = 8 + 6;
+            _buffer[4] = (byte)0;                     // Content Length 1
+            _buffer[5] = (byte)6;                     // Content Length 0
         }
 
-        /// <summary>
-        /// Send the record through the connection.
-        /// </summary>
-        /// <param name="stream">Stream of the connection socket.</param>
-        public async Task sendAsync(NetworkStream stream) {
-            try {
-                await stream.WriteAsync(this.buffer, 0, this.bufferEnd);
-                await stream.FlushAsync();
-            } catch (Exception e) {
-                throw(new ClientException("Socket disconnected while trying to write to stream.", e));
-            }
+        _buffer[6] = 0;     // Padding
+        _buffer[7] = 0;     // Reserved
+
+        /*
+            Set content
+        */
+        if (_isLittleEndian) 
+        {
+            _buffer[8] = (byte)(appStatus >> 24);
+            _buffer[9] = (byte)(appStatus >> 16);
+            _buffer[10] = (byte)(appStatus >> 8);
+            _buffer[11] = (byte)appStatus;
+        } 
+        else 
+        {
+            _buffer[8] = (byte)appStatus;
+            _buffer[9] = (byte)(appStatus << 8);
+            _buffer[10] = (byte)(appStatus << 16);
+            _buffer[11] = (byte)(appStatus << 24);
+        }
+
+        _buffer[12] = protocolStatus;
+        _buffer[13] = 0;
+
+        _bufferEnd = 8 + 6;
+    }
+
+    /// <summary>
+    /// Send the record through the connection.
+    /// </summary>
+    /// <param name="stream">Stream of the connection socket.</param>
+    public async Task sendAsync(NetworkStream stream) 
+    {
+        try 
+        {
+            await stream.WriteAsync(_buffer, 0, _bufferEnd);
+            await stream.FlushAsync();
+        } 
+        catch (Exception e) 
+        {
+            throw new ClientException("Socket disconnected while trying to write to stream.", e);
         }
     }
 }

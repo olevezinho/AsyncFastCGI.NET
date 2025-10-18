@@ -16,25 +16,25 @@
 using System;
 using System.Threading.Tasks;
 using System.Net;
+using AsyncFastCGI;
 
 namespace FastCgiExampleApp
 {
-    class Program
+    static class Program
     {
         static async Task Main(string[] args)
         {
-            try {
+            try 
+            {
                 /*
                     Check the input parameter (port)
                 */
-                if (args.Length < 1) {
-                    throw(new Exception("Input parameter 'port' missing."));
-                }
+                if (args.Length < 1)
+                    throw new Exception("Input parameter 'port' missing.");
 
-                int port = 0;
-                if (!Int32.TryParse(args[0], out port)) {
-                    throw(new Exception("Invalid port value."));
-                }
+                var port = 0;
+                if (!int.TryParse(args[0], out port))
+                    throw new Exception("Invalid port value.");
 
                 /*
                     Create and start the async FastCGI client
@@ -49,11 +49,15 @@ namespace FastCgiExampleApp
                 client.RequestHandler = Program.RequestHandler;
                 
                 await client.StartAsync();
-            } catch (AsyncFastCGI.ClientException e) {
-                Console.Error.WriteLine(e.Message);
+            } 
+            catch (AsyncFastCGI.ClientException e) 
+            {
+                await Console.Error.WriteLineAsync(e.Message);
                 Environment.Exit(1);
-            } catch (Exception e) {
-                Console.Error.WriteLine(e.ToString());
+            } 
+            catch (Exception e) 
+            {
+                await Console.Error.WriteLineAsync(e.ToString());
                 Environment.Exit(1);
             }
         }
@@ -61,34 +65,37 @@ namespace FastCgiExampleApp
         /// <summary>
         /// Here comes your code to handle requests.
         /// </summary>
-        private static async Task RequestHandler(AsyncFastCGI.Input input, AsyncFastCGI.Output output) {
+        private static async Task RequestHandler(Input input, Output output) 
+        {
             output.SetHttpStatus(200);
             output.SetHeader("Content-Type", "text/html; charset=utf-8");
 
-            string requestURI = input.GetParameter("REQUEST_URI");
-            string requestMethod = input.GetParameter("REQUEST_METHOD");
-            string remoteAddress = input.GetParameter("REMOTE_ADDR");
-            string requestData = WebUtility.HtmlEncode(await input.GetContentAsync());
+            var requestURI = input.GetParameter("REQUEST_URI");
+            var requestMethod = input.GetParameter("REQUEST_METHOD");
+            var remoteAddress = input.GetParameter("REMOTE_ADDR");
+            var requestData = WebUtility.HtmlEncode(await input.GetContentAsync());
 
-            await output.WriteAsync($@"<!DOCTYPE html>
-<html>
-    <body>
-        <h1>Hello World!</h1>
-        
-        <p><b>Request URI:</b> {requestURI}</p>
-        <p><b>Request Method:</b> {requestMethod}</p>
-        <p><b>Remote Address:</b> {remoteAddress}</p>
-        <p>
-            <form method='post'>
-                <input type='text' name='data' length='60'>
-                <input type='submit' value='Submit'>
-            </form>
-        </p>
-        <p><b>Posted data:</b></p>
-        <pre>{requestData}</pre>
-    </body>
-</html>
-");
+            await output.WriteAsync($"""
+                                     <!DOCTYPE html>
+                                     <html>
+                                         <body>
+                                             <h1>Hello World!</h1>
+                                             
+                                             <p><b>Request URI:</b> {requestURI}</p>
+                                             <p><b>Request Method:</b> {requestMethod}</p>
+                                             <p><b>Remote Address:</b> {remoteAddress}</p>
+                                             <p>
+                                                 <form method='post'>
+                                                     <input type='text' name='data' length='60'>
+                                                     <input type='submit' value='Submit'>
+                                                 </form>
+                                             </p>
+                                             <p><b>Posted data:</b></p>
+                                             <pre>{requestData}</pre>
+                                         </body>
+                                     </html>
+
+                                     """);
 
             await output.EndAsync();
         }

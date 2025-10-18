@@ -14,88 +14,97 @@
  * limitations under the License.
  */
 using System;
-using System.IO;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 
-namespace AsyncFastCGI {
-    class Request {
-        private int index;
-        private Record inputRecord;
-        private Record outputRecord;
-        private int maxHeaderSize;
-        private FifoStream inputBuffer;
-        private FifoStream outputBuffer;
+namespace AsyncFastCGI;
 
-        private Client.RequestHandlerDelegate requestHandler;
+public class Request 
+{
+    private int _index;
+    private Record _inputRecord;
+    private Record _outputRecord;
+    private int _maxHeaderSize;
+    private FifoStream _inputBuffer;
+    private FifoStream _outputBuffer;
 
-        /// <summary>
-        /// Constructor
-        /// </summary>
-        /// <param name="index">The index of the request, by which the Client object identifies it.</param>
-        /// <param name="requestHandler">The client callback, which handles the incoming HTTP requests.</param>
-        /// <param name="maxHeaderSize">The maximum allowed HTTP header size.</param>
-        public Request(int index, Client.RequestHandlerDelegate requestHandler, int maxHeaderSize) {
-            this.index = index;
-            this.inputRecord = new Record();
-            this.outputRecord = new Record();
-            this.requestHandler = requestHandler;
-            this.maxHeaderSize = maxHeaderSize;
-            this.inputBuffer = new FifoStream(maxHeaderSize);
-            this.outputBuffer = new FifoStream(maxHeaderSize);
-        }
+    private Client.RequestHandlerDelegate _requestHandler;
 
-        /// <summary>
-        /// Get the index of the request, by which the Client object identifies it.
-        /// </summary>
-        /// <returns>The integer index of the request.</returns>
-        public int GetIndex() {
-            return this.index;
-        }
+    /// <summary>
+    /// Constructor
+    /// </summary>
+    /// <param name="index">The index of the request, by which the Client object identifies it.</param>
+    /// <param name="requestHandler">The client callback, which handles the incoming HTTP requests.</param>
+    /// <param name="maxHeaderSize">The maximum allowed HTTP header size.</param>
+    public Request(int index, Client.RequestHandlerDelegate requestHandler, int maxHeaderSize) 
+    {
+        _index = index;
+        _inputRecord = new Record();
+        _outputRecord = new Record();
+        _requestHandler = requestHandler;
+        _maxHeaderSize = maxHeaderSize;
+        _inputBuffer = new FifoStream(maxHeaderSize);
+        _outputBuffer = new FifoStream(maxHeaderSize);
+    }
 
-        /// <summary>
-        /// Handles new incoming connections.
-        /// The caller should not wait on it.
-        /// </summary>
-        /// <param name="request">The socket for the new incoming connection.</param>
-        /// <returns>The index of the Request.</returns>
-        public async Task<int> NewConnection(Socket request) {
-            NetworkStream stream = new NetworkStream(request);
-            Input input;
-            Output output;
+    /// <summary>
+    /// Get the index of the request, by which the Client object identifies it.
+    /// </summary>
+    /// <returns>The integer index of the request.</returns>
+    public int GetIndex() => _index;
 
-            do {
-                input = new Input(request, stream, this.inputRecord, this.inputBuffer, this.maxHeaderSize);
+    /// <summary>
+    /// Handles new incoming connections.
+    /// The caller should not wait on it.
+    /// </summary>
+    /// <param name="request">The socket for the new incoming connection.</param>
+    /// <returns>The index of the Request.</returns>
+    public async Task<int> NewConnection(Socket request) 
+    {
+        var stream = new NetworkStream(request);
+        Input input;
+        Output output;
 
-                try {
-                    await input.Initialize();
-                } catch (ClientException e) {
-                    Console.Error.WriteLine(e.Message);
-                    request.Close();
-                    return this.index;
-                }
+        do 
+        {
+            input = new Input(request, stream, _inputRecord, _inputBuffer, _maxHeaderSize);
+
+            try 
+            {
+                await input.Initialize();
+            } 
+            catch (ClientException e) 
+            {
+                await Console.Error.WriteLineAsync(e.Message);
+                request.Close();
+                return _index;
+            }
                 
-                output = new Output(input, request, stream, input.GetFastCgiRequestID(), this.outputRecord, this.outputBuffer);
+            output = new Output(input, request, stream, input.GetFastCgiRequestID(), _outputRecord, _outputBuffer);
 
-                try {
-                    await this.requestHandler(input, output);
+            try 
+            {
+                await _requestHandler(input, output);
 
-                    if (!output.IsEnded()) {
-                        await output.EndAsync();
-                    }
-                } catch (ClientException e) {
-                    Console.Error.WriteLine(e.Message);
-                    request.Close();
-                    return this.index;
+                if (!output.IsEnded()) 
+                {
+                    await output.EndAsync();
                 }
-            } while (input.IsKeepConnection());
+            } 
+            catch (ClientException e) 
+            {
+                await Console.Error.WriteLineAsync(e.Message);
+                request.Close();
+                return _index;
+            }
+        } 
+        while (input.IsKeepConnection());
 
-            // If keepConnection == false, then the client is responsible for closing the connection.
-            // (Lingering is configured already)
-            request.Shutdown(SocketShutdown.Both);
-            request.Disconnect(false);
+        // If keepConnection == false, then the client is responsible for closing the connection.
+        // (Lingering is configured already)
+        request.Shutdown(SocketShutdown.Both);
+        await request.DisconnectAsync(false);
 
-            return this.index;
-        }
+        return _index;
     }
 }
